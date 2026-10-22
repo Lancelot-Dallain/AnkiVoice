@@ -56,6 +56,18 @@ describe('judgeAnswer', () => {
     expect(provider.complete).not.toHaveBeenCalled()
   })
 
+  it('a spoken homophone is simply right; a typed one gets a spelling note', async () => {
+    const card = { french: 'améliorer', english: 'to improve' }
+    await expect(judgeAnswer(input(['amélioré'], { ...card, via: 'voice' }), null, messages)).resolves.toMatchObject({
+      correct: true,
+      feedback: 'Exact !',
+    })
+    await expect(judgeAnswer(input(['amélioré'], { ...card, via: 'keyboard' }), null, messages)).resolves.toMatchObject({
+      correct: true,
+      feedback: 'Presque',
+    })
+  })
+
   it('judges FR→EN answers against the English side', async () => {
     const verdict = await judgeAnswer(input(['borrow'], { direction: 'fr-en' }), null, messages)
     expect(verdict.correct).toBe(true)

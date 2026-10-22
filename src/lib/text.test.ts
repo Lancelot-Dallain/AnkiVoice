@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { cleanField, hintFor, levenshtein, localMatch, maskInExample, normalize, splitAlternatives } from './text'
+import { cleanField, frenchSoundKey, hintFor, levenshtein, localMatch, maskInExample, normalize, splitAlternatives } from './text'
 
 describe('cleanField', () => {
   it('strips HTML, sound tags and entities from Anki fields', () => {
@@ -60,6 +60,31 @@ describe('localMatch', () => {
     expect(localMatch([''], 'emprunter', 'fr').correct).toBe(false)
     // Short words get no typo tolerance.
     expect(localMatch(['cat'], 'car', 'en').correct).toBe(false)
+  })
+})
+
+describe('French homophones (speech recognition picks a spelling at random)', () => {
+  const key = (s: string) => frenchSoundKey(normalize(s, 'fr'))
+
+  it('gives the same key to words that sound the same', () => {
+    expect(key('améliorait')).toBe(key('améliorer'))
+    expect(key('améliorez')).toBe(key('améliorer'))
+    expect(key('compétences')).toBe(key('compétence'))
+    expect(key('en prunter')).toBe(key('emprunter'))
+    expect(key('des inconvénients')).toBe(key('un inconvénient'))
+    expect(key('fotographie')).toBe(key('photographie'))
+  })
+
+  it('keeps different words apart', () => {
+    expect(key('prêter')).not.toBe(key('emprunter'))
+    expect(key('avantage')).not.toBe(key('inconvénient'))
+    expect(key('fiable')).not.toBe(key('faible'))
+  })
+
+  it('accepts a homophone and flags it', () => {
+    expect(localMatch(['améliorait'], 'améliorer, progresser', 'fr')).toMatchObject({ correct: true, homophone: true })
+    expect(localMatch(['en prunter'], 'emprunter', 'fr')).toMatchObject({ correct: true, homophone: true })
+    expect(localMatch(['un avantage'], 'un inconvénient', 'fr').correct).toBe(false)
   })
 })
 

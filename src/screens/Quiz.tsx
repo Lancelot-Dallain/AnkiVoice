@@ -1,4 +1,4 @@
-import { ArrowRight, BookmarkPlus, Check, Keyboard, Lightbulb, Mic, ThumbsUp, Volume2, VolumeX, X } from 'lucide-react'
+import { ArrowRight, BookmarkPlus, Check, Ear, Keyboard, Lightbulb, Mic, ThumbsUp, Volume2, VolumeX, X } from 'lucide-react'
 import { AnimatePresence, motion } from 'motion/react'
 import { type Dispatch, type FormEvent, useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react'
 import { MicButton, type MicStatus } from '../components/MicButton'
@@ -8,7 +8,7 @@ import { addAcceptedAnswer } from '../lib/anki/cards'
 import { AnkiConnectClient } from '../lib/anki/client'
 import { judgeAnswer } from '../lib/judge'
 import { createProvider, type LlmProvider } from '../lib/llm'
-import { createSession, type SessionAction, sessionReducer, type SessionState } from '../lib/session'
+import { type Attempt, createSession, type SessionAction, sessionReducer, type SessionState } from '../lib/session'
 import type { Settings } from '../lib/settings'
 import {
   isRecognitionSupported,
@@ -267,7 +267,7 @@ function QuizCard({
     let verdict
     try {
       verdict = await judgeAnswer(
-        { direction, english: card.english, french: card.french, example: card.example, kind: card.kind, candidates },
+        { direction, english: card.english, french: card.french, example: card.example, kind: card.kind, candidates, via },
         provider,
         t.quiz.judge,
         controller.signal,
@@ -279,7 +279,8 @@ function QuizCard({
     setMic('idle')
     setTyped('')
     setInterim('')
-    dispatch({ type: 'answered', attempt: { text: candidates[0] ?? '', via, verdict } })
+    const alternatives = via === 'voice' ? [...new Set(candidates.slice(1))].filter((c) => c !== candidates[0]) : undefined
+    dispatch({ type: 'answered', attempt: { text: candidates[0] ?? '', via, verdict, alternatives } })
   }
 
   const startListening = () => {
@@ -307,6 +308,12 @@ function QuizCard({
   }
 
   const stopListening = () => listenRef.current?.stop()
+
+  /** "That's not what I said": forget the misheard answer and listen again. */
+  const relisten = () => {
+    dispatch({ type: 'retract' })
+    startListening()
+  }
 
   // Read the card aloud when it appears (and optionally open the mic).
   useEffect(() => {
@@ -441,6 +448,7 @@ function QuizCard({
               isLast={isLast}
               onNext={onNext}
               onAddAnswer={onAddAnswer}
+              onRelisten={relisten}
             />
           ) : (
             <div className="flex flex-col items-center gap-5">
@@ -452,9 +460,15 @@ function QuizCard({
                       {lastAttempt.via === 'voice' ? t.quiz.heard : t.quiz.typed} « {lastAttempt.text} ».{' '}
                     </>
                   )}
+                  <Alternatives attempt={lastAttempt} />
                   {lastAttempt.verdict.source === 'llm' && lastAttempt.verdict.feedback}
                   {lastAttempt.verdict.source === 'local' && lastAttempt.text && (
                     <span className="mt-1 block text-xs opacity-80">{provider ? t.quiz.judge.llmFailed : t.quiz.noAiHint}</span>
+                  )}
+                  {lastAttempt.via === 'voice' && (
+                    <Button size="sm" variant="secondary" className="mt-2 mr-2" icon={<Ear className="size-4" />} onClick={relisten}>
+                      {t.quiz.notWhatISaid}
+                    </Button>
                   )}
                   {lastAttempt.text && (
                     <Button
@@ -566,7 +580,10 @@ function Reveal({
   isLast,
   onNext,
   onAddAnswer,
-}: Pick<QuizCardProps, 'card' | 'direction' | 'state' | 'dispatch' | 'demo' | 'isLast' | 'onNext' | 'onAddAnswer'>) {
+  onRelisten,
+}: Pick<QuizCardProps, 'card' | 'direction' | 'state' | 'dispatch' | 'demo' | 'isLast' | 'onNext' | 'onAddAnswer'> & {
+  onRelisten: () => void
+}) {
   const outcome = state.outcome ?? 'missed'
   const style = OUTCOME_STYLE[outcome]
   const Icon = style.icon
@@ -619,15 +636,23 @@ function Reveal({
               {attempt.text || '—'}
             </Badge>
           ))}
+          {last && <Alternatives attempt={last} className="w-full" />}
         </div>
       )}
 
       {last?.verdict.llmError && <p className="text-xs text-amber-600 dark:text-amber-300">{t.quiz.judge.llmFailed}</p>}
 
       {canOverrule && (
-        <Button size="sm" icon={<ThumbsUp className="size-4" />} onClick={() => dispatch({ type: 'overrule', feedback: t.quiz.overruled })}>
-          {t.quiz.myAnswerWasRight(last.text)}
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          {last.via === 'voice' && (
+            <Button size="sm" icon={<Ear className="size-4" />} onClick={onRelisten}>
+              {t.quiz.notWhatISaid}
+            </Button>
+          )}
+          <Button size="sm" icon={<ThumbsUp className="size-4" />} onClick={() => dispatch({ type: 'overrule', feedback: t.quiz.overruled })}>
+            {t.quiz.myAnswerWasRight(last.text)}
+          </Button>
+        </div>
       )}
 
       {last?.verdict.overruled && (
@@ -693,5 +718,15 @@ function Reveal({
         <ArrowRight className="size-5" />
       </Button>
     </motion.div>
+  )
+}
+
+/** The other hypotheses of the speech recognition, to understand what it heard. */
+function Alternatives({ attempt, className }: { attempt: Attempt; className?: string }) {
+  if (attempt.via !== 'voice' || !attempt.alternatives?.length) return null
+  return (
+    <span className={cx('block text-xs text-slate-500 dark:text-slate-400', className)}>
+      {t.quiz.alternatives} {attempt.alternatives.map((a) => `« ${a} »`).join(' · ')}
+    </span>
   )
 }

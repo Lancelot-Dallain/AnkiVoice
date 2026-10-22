@@ -10,6 +10,8 @@ export interface JudgeInput {
   kind: CardKind
   /** Speech recognition alternatives (best first) or the typed answer. */
   candidates: string[]
+  /** How the answer was given: a homophone is only a spelling issue when typed. */
+  via?: 'voice' | 'keyboard'
 }
 
 export type VerdictSource = 'local' | 'llm'
@@ -108,7 +110,9 @@ export async function judgeAnswer(
   const expected = input.direction === 'en-fr' ? input.french : input.english
   const local = localMatch(candidates, expected, answerLang(input.direction))
   if (local.correct) {
-    return { correct: true, close: local.close, feedback: local.close ? messages.close : messages.exact, source: 'local' }
+    // Speech recognition picked another spelling of the same sound: not the learner's fault.
+    const spellingIssue = local.close && !(local.homophone && input.via === 'voice')
+    return { correct: true, close: local.close, feedback: spellingIssue ? messages.close : messages.exact, source: 'local' }
   }
   if (!provider) return { correct: false, feedback: messages.wrongOffline, source: 'local' }
 

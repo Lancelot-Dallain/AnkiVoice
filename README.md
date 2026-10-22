@@ -122,6 +122,10 @@ Students never need to pay: "None" and Ollama are free.
 
 - **It does not grade your pronunciation.** Browser speech recognition picks the most *plausible word*: a slightly wrong
   pronunciation is often "corrected" silently. Real phonetic feedback is planned for v0.3.
+- **Isolated words are hard to transcribe**, even in your native language: the browser has no sentence to guess from and often picks
+  the wrong homophone ("amélioré" for "améliorer", "en prunté" for "emprunter"). AnkiVoice compares French answers by *sound*, so these
+  count as right; it shows the other hypotheses it heard; and **"Ce n'est pas ce que j'ai dit"** (*that's not what I said*) drops a
+  misheard answer and listens again, without costing you a try.
 - **Speech recognition** only works in Chrome, Edge and Safari. Firefox users answer with the keyboard.
 - **Voices**: English is always read with an English voice. If your computer has no English voice installed (common on French
   Windows), AnkiVoice shows the word in writing instead of reading it with a French accent. To add one on Windows:

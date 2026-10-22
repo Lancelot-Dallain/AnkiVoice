@@ -93,6 +93,8 @@ export const fr = {
     noAiHint:
       'Sans correcteur IA, seules les réponses écrites sur la carte sont reconnues. Un synonyme correct ? Cliquez sur « J’avais juste ».',
     iWasRight: 'J’avais juste',
+    notWhatISaid: 'Ce n’est pas ce que j’ai dit',
+    alternatives: 'Autres hypothèses entendues :',
     myAnswerWasRight: (answer: string) => `Ma réponse « ${answer} » était bonne`,
     overruled: 'Réponse acceptée par vous.',
     teach: {

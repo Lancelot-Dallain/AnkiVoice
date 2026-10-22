@@ -68,6 +68,32 @@ describe('session state machine', () => {
     expect(sessionReducer(silent, { type: 'overrule', feedback: '' })).toBe(silent)
   })
 
+  it('"That\'s not what I said" drops a misheard first answer without penalty', () => {
+    const misheard: Attempt = { text: 'en printemps', via: 'voice', verdict: wrong }
+    let s = sessionReducer(start(), { type: 'answered', attempt: misheard })
+    s = sessionReducer(s, { type: 'retract' })
+    expect(s).toMatchObject({ phase: 'answer', stage: 'first', attempts: [] })
+    s = sessionReducer(s, { type: 'answered', attempt: { ...misheard, text: 'emprunter', verdict: right } })
+    expect(s).toMatchObject({ outcome: 'first', ease: 3 })
+  })
+
+  it('"That\'s not what I said" after a second misheard answer goes back to the second try', () => {
+    const voiceWrong: Attempt = { text: 'x', via: 'voice', verdict: wrong }
+    let s = sessionReducer(start(), { type: 'answered', attempt: voiceWrong })
+    s = sessionReducer(s, { type: 'answered', attempt: { ...voiceWrong, text: 'y' } })
+    expect(s.phase).toBe('reveal')
+    s = sessionReducer(s, { type: 'retract' })
+    expect(s).toMatchObject({ phase: 'answer', stage: 'retry', outcome: undefined, ease: undefined })
+    expect(s.attempts.map((a) => a.text)).toEqual(['x'])
+  })
+
+  it('cannot retract a typed answer or a right one', () => {
+    const typed = sessionReducer(start(), { type: 'answered', attempt: attempt(wrong) })
+    expect(sessionReducer(typed, { type: 'retract' })).toBe(typed)
+    const ok = sessionReducer(start(), { type: 'answered', attempt: { text: 'a', via: 'voice', verdict: right } })
+    expect(sessionReducer(ok, { type: 'retract' })).toBe(ok)
+  })
+
   it('ends after the last card', () => {
     let s = start(1)
     s = sessionReducer(s, { type: 'give-up' })

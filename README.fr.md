@@ -122,6 +122,10 @@ Les élèves n'ont jamais à payer : « Sans IA » et Ollama sont gratuits.
 
 - **Elle ne note pas votre prononciation.** La reconnaissance vocale du navigateur choisit le *mot le plus plausible* : une
   prononciation un peu fausse est souvent « corrigée » sans le dire. Un vrai retour phonétique est prévu en v0.3.
+- **Les mots isolés sont difficiles à transcrire**, même dans votre langue : le navigateur n'a pas de phrase pour deviner et choisit souvent
+  le mauvais homophone (« amélioré » pour « améliorer », « en prunté » pour « emprunter »). AnkiVoice compare les réponses françaises *au son*,
+  donc ces cas comptent comme justes ; il affiche les autres hypothèses entendues ; et **« Ce n'est pas ce que j'ai dit »** efface une réponse
+  mal entendue et relance le micro, sans vous coûter d'essai.
 - **La reconnaissance vocale** ne fonctionne que dans Chrome, Edge et Safari. Sous Firefox, on répond au clavier.
 - **Les voix** : l'anglais est toujours lu avec une voix anglaise. Si votre ordinateur n'en a aucune (fréquent sur un Windows français),
   AnkiVoice affiche le mot écrit au lieu de le lire avec l'accent français. Pour en ajouter une sous Windows :

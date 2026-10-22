@@ -89,6 +89,8 @@ export interface LocalMatch {
   correct: boolean
   /** Matched only approximately (a typo or a near-miss transcription). */
   close: boolean
+  /** Spelled differently but pronounced the same (French homophones). */
+  homophone?: boolean
   /** The expected alternative that matched. */
   matched?: string
 }
@@ -124,9 +126,51 @@ export function localMatch(candidates: string[], expected: string, lang: 'en' | 
       if (!close && tolerance > 0 && levenshtein(answer, norm) <= tolerance) {
         close = { correct: true, close: true, matched: alt }
       }
+      // Same sound, other spelling: "amélioré" for "améliorer", "en prunté" for "emprunter".
+      if (lang === 'fr' && (!close || !close.homophone) && frenchSoundKey(answer) === frenchSoundKey(norm)) {
+        close = { correct: true, close: true, homophone: true, matched: alt }
+      }
     }
   }
   return close ?? { correct: false, close: false }
+}
+
+/**
+ * A rough "how it sounds" key for French, so that speech recognition picking
+ * the wrong homophone is not counted as a mistake. Words that sound alike get
+ * the same key: améliorer / amélioré / améliorez / améliorait, compétence /
+ * compétences, "en prunter" / emprunter. Expects text already passed through
+ * `normalize` (lowercase, no accents). Deliberately tolerant on gender and
+ * number agreement, which a vocabulary quiz does not test.
+ */
+export function frenchSoundKey(normalized: string): string {
+  return normalized
+    .split(' ')
+    .filter(Boolean)
+    .map((word) =>
+      word
+        // Silent plural / final consonants, then the many spellings of the "é" ending.
+        .replace(/[sx]$/, '')
+        .replace(/(aient|ait|ais|ai|ez|er|et|ee|e)$/, '')
+        .replace(/[td]$/, '')
+        // Same sound, different letters.
+        .replace(/ph/g, 'f')
+        .replace(/qu/g, 'k')
+        .replace(/c(?=[eiy])/g, 's')
+        .replace(/g(?=[eiy])/g, 'j')
+        .replace(/gu(?=[eiy])/g, 'g')
+        .replace(/c/g, 'k')
+        .replace(/h/g, '')
+        .replace(/y/g, 'i')
+        .replace(/eau|au/g, 'o')
+        .replace(/ei|ai/g, 'e')
+        .replace(/[ae][nm](?=[^aeiou]|$)/g, 'A')
+        .replace(/(?:ai|ei|i|u)[nm](?=[^aeiou]|$)/g, 'I')
+        .replace(/on(?=[^aeiou]|$)/g, 'O')
+        .replace(/(?<=[aeiouAIO])s(?=[aeiou])/g, 'z')
+        .replace(/([a-z])\1+/g, '$1'),
+    )
+    .join('')
 }
 
 /** First letter and letter count of the main English answer, for the FR→EN hint. */

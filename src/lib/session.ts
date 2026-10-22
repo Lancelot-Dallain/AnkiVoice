@@ -19,6 +19,9 @@ import type { Verdict } from './judge'
  *
  * "I was right" overrules the judge on the last wrong answer (a valid
  * synonym the card doesn't list): the card counts as found on that try.
+ *
+ * "That's not what I said" removes a misheard spoken answer, as if it had
+ * never been given, so a transcription error never costs a try.
  */
 
 export type Stage = 'first' | 'retry'
@@ -27,6 +30,8 @@ export interface Attempt {
   text: string
   via: 'voice' | 'keyboard'
   verdict: Verdict
+  /** Other things the speech recognition thought it heard. */
+  alternatives?: string[]
 }
 
 export interface SessionState {
@@ -47,6 +52,8 @@ export type SessionAction =
   | { type: 'set-ease'; ease: Ease }
   /** The learner overrules the judge: their last wrong answer was right. */
   | { type: 'overrule'; feedback: string }
+  /** "That's not what I said": drop a misheard spoken answer without penalty. */
+  | { type: 'retract' }
   | { type: 'next' }
 
 /** Picks a direction per card; "mixed" alternates randomly. */
@@ -92,6 +99,22 @@ export function sessionReducer(state: SessionState, action: SessionAction): Sess
         k === i ? { ...a, verdict: { ...a.verdict, correct: true, overruled: true, feedback: action.feedback } } : a,
       )
       return reveal(state, i === 0 ? 'first' : 'retry', attempts)
+    }
+    case 'retract': {
+      const last = state.attempts[state.attempts.length - 1]
+      if (!last || last.via !== 'voice' || last.verdict.correct) return state
+      const attempts = state.attempts.slice(0, -1)
+      const fromRetry = state.phase === 'answer' && state.stage === 'retry'
+      const fromMissed = state.phase === 'reveal' && state.outcome === 'missed'
+      if (!fromRetry && !fromMissed) return state
+      return {
+        ...state,
+        attempts,
+        phase: 'answer',
+        stage: attempts.length ? 'retry' : 'first',
+        outcome: undefined,
+        ease: undefined,
+      }
     }
     case 'set-ease':
       if (state.phase !== 'reveal') return state
