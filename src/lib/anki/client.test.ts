@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { loadDueCards, guessMapping, previewDeck, toStudyCard } from './cards'
+import { addAcceptedAnswer, appendAlternative, guessMapping, loadDueCards, previewDeck, toStudyCard } from './cards'
 import { AnkiConnectClient, AnkiError, type CardInfo, deckQuery } from './client'
 
 type Handler = (action: string, params: Record<string, unknown> | undefined) => unknown
@@ -137,6 +137,28 @@ describe('cards', () => {
     const cards = await loadDueCards(client, { deck: 'English', mapping, limit: 10, includeNew: true, newLimit: 2 })
     expect(cards.map((c) => c.id)).toEqual([1, 2, 3, 4])
     expect(anki.calls[0].params?.query).toBe('deck:"English" -is:suspended -is:buried is:due')
+  })
+
+  it('appends an accepted answer to a field', () => {
+    expect(appendAlternative('emprunter', 'se faire prêter')).toBe('emprunter, se faire prêter')
+    expect(appendAlternative('<b>emprunter</b>&nbsp;<br>', 'a<b')).toBe('<b>emprunter</b>, a&lt;b')
+    expect(appendAlternative('', 'x')).toBe('x')
+  })
+
+  it('adds a new accepted answer to the note in Anki, once', async () => {
+    const anki = fakeAnki((action) => {
+      if (action === 'cardsInfo') return [info(7, { Front: 'to borrow', Back: 'emprunter' })]
+      if (action === 'updateNoteFields') return null
+    })
+    const client = new AnkiConnectClient({ fetch: anki.fetch })
+    await expect(addAcceptedAnswer(client, 7, 'Back', 'se faire prêter', 'fr')).resolves.toBe('added')
+    expect(anki.calls[1]).toEqual({
+      action: 'updateNoteFields',
+      params: { note: { id: 70, fields: { Back: 'emprunter, se faire prêter' } } },
+      key: undefined,
+    })
+    await expect(addAcceptedAnswer(client, 7, 'Back', 'Emprunter', 'fr')).resolves.toBe('present')
+    expect(anki.calls.filter((c) => c.action === 'updateNoteFields')).toHaveLength(1)
   })
 
   it('previews a deck', async () => {

@@ -93,6 +93,14 @@ Without AI, AnkiVoice compares your answer with the card, ignoring articles, acc
 alternative written on the card (`emprunter, se faire prêter`). With an AI, it also accepts synonyms and agreement differences,
 and explains mistakes in one short sentence. Exact matches never call the AI, so it stays cheap.
 
+A card rarely lists every valid translation. So whatever the judge says, **you have the last word**:
+
+- **"J'avais juste"** (*I was right*) — if a correct synonym is refused, one click counts it as right
+  (Good if it was your first answer, Hard if it was your second).
+- **"Ajouter à la carte Anki"** (*add to the Anki card*) — in a real session, AnkiVoice can then append your answer to the card
+  (`emprunter` → `emprunter, se faire prêter`, via AnkiConnect's `updateNoteFields`). Next time it is accepted, even without AI.
+  Nothing is ever written to your cards without that click.
+
 | Provider | Cost | Setup |
 | --- | --- | --- |
 | **None** | Free | Nothing to do |

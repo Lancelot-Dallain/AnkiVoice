@@ -1,6 +1,6 @@
 import type { StudyCard } from '../../types'
 import { parseKind } from '../grading'
-import { cleanField } from '../text'
+import { cleanField, localMatch } from '../text'
 import { type AnkiConnectClient, type CardInfo, deckQuery } from './client'
 
 /** Which Anki field holds what. Empty string = not used. */
@@ -110,4 +110,32 @@ export async function loadDueCards(client: AnkiConnectClient, options: LoadOptio
     .filter((info): info is CardInfo => Boolean(info))
     .map((info) => toStudyCard(info, options.mapping))
     .filter((card): card is StudyCard => card !== null)
+}
+
+/** Appends an answer to a field's HTML ("emprunter" → "emprunter, se faire prêter"). */
+export function appendAlternative(fieldHtml: string, answer: string): string {
+  const escaped = answer.trim().replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+  const trimmed = fieldHtml.replace(/(\s|&nbsp;|<br\s*\/?>)+$/i, '')
+  return trimmed ? `${trimmed}, ${escaped}` : escaped
+}
+
+/**
+ * Teaches a card a new accepted answer: adds it to the field in Anki so that
+ * it is recognised next time, even without an AI. Does nothing if the answer
+ * is already there.
+ */
+export async function addAcceptedAnswer(
+  client: AnkiConnectClient,
+  cardId: number,
+  field: string,
+  answer: string,
+  lang: 'en' | 'fr',
+): Promise<'added' | 'present'> {
+  const [info] = await client.cardsInfo([cardId])
+  if (!info || !(field in info.fields)) throw new Error(`Field "${field}" not found on card ${cardId}`)
+  const current = info.fields[field].value
+  const match = localMatch([answer], cleanField(current), lang)
+  if (match.correct && !match.close) return 'present'
+  await client.updateNoteFields(info.note, { [field]: appendAlternative(current, answer) })
+  return 'added'
 }

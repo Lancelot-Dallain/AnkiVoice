@@ -93,6 +93,14 @@ Sans IA, AnkiVoice compare votre réponse à la carte en ignorant les articles, 
 et accepte toutes les variantes écrites sur la carte (`emprunter, se faire prêter`). Avec une IA, il accepte aussi les synonymes et les
 différences d'accord, et explique l'erreur en une phrase. Une réponse exacte n'appelle jamais l'IA : le coût reste minime.
 
+Une carte liste rarement toutes les traductions possibles. Quel que soit le correcteur, **vous avez le dernier mot** :
+
+- **« J'avais juste »** — si un synonyme correct est refusé, un clic le compte comme bon
+  (Bien si c'était votre première réponse, Difficile si c'était la deuxième).
+- **« Ajouter à la carte Anki »** — dans une vraie séance, AnkiVoice peut ensuite ajouter votre réponse à la carte
+  (`emprunter` → `emprunter, se faire prêter`, par l'action `updateNoteFields` d'AnkiConnect). La prochaine fois, elle sera acceptée même sans IA.
+  Rien n'est jamais écrit dans vos cartes sans ce clic.
+
 | Fournisseur | Coût | Mise en place |
 | --- | --- | --- |
 | **Sans IA** | Gratuit | Rien à faire |

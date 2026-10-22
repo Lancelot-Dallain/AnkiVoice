@@ -23,6 +23,8 @@ export interface Verdict {
   close?: boolean
   /** The AI judge was configured but failed; we fell back on the local check. */
   llmError?: string
+  /** The learner said "I was right" and overruled the judge. */
+  overruled?: boolean
 }
 
 export const VERDICT_SCHEMA = {
@@ -49,7 +51,8 @@ You check ONE answer from a flashcard quiz and reply with JSON only: {"correct":
 
 How to judge:
 - The answer usually comes from speech recognition: ignore capitalisation, punctuation, filler words ("euh", "um") and obvious homophones or transcription slips.
-- Judge meaning, not the exact wording of the card. Several candidate transcriptions may be given; the answer is correct if any of them is.
+- The card lists only SOME possible translations. Accept ANY correct translation of the word or phrase: synonyms, other common meanings of the same word, a verb in the infinitive or with "to", a noun with or without article, a different gender or number. Mark it wrong only if a good dictionary would not give it as a translation, or if it is a different word.
+- Several candidate transcriptions may be given; the answer is correct if any of them is.
 - Be fair: a learner who clearly knows the word must not be marked wrong for a detail the card does not test.
 
 Feedback: ONE short sentence in French (20 words max), addressed to the learner with "tu". If wrong, say what was expected or what the answer actually means. If right, add a useful nuance or leave it encouraging. No markdown.`

@@ -1,9 +1,10 @@
-import { ArrowRight, Check, Keyboard, Lightbulb, Mic, Volume2, VolumeX, X } from 'lucide-react'
+import { ArrowRight, BookmarkPlus, Check, Keyboard, Lightbulb, Mic, ThumbsUp, Volume2, VolumeX, X } from 'lucide-react'
 import { AnimatePresence, motion } from 'motion/react'
 import { type Dispatch, type FormEvent, useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react'
 import { MicButton, type MicStatus } from '../components/MicButton'
 import { Alert, Badge, Button, Card, cx, Input, Kbd, type Tone } from '../components/ui'
 import { t } from '../i18n'
+import { addAcceptedAnswer } from '../lib/anki/cards'
 import { AnkiConnectClient } from '../lib/anki/client'
 import { judgeAnswer } from '../lib/judge'
 import { createProvider, type LlmProvider } from '../lib/llm'
@@ -18,7 +19,7 @@ import {
   type SpeechLang,
   stopSpeaking,
 } from '../lib/speech'
-import { hintFor, maskInExample } from '../lib/text'
+import { answerLang, hintFor, maskInExample } from '../lib/text'
 import { useSettings, useVoiceAvailability } from '../state'
 import type { Direction, Ease, StudyCard } from '../types'
 import { Summary, type SyncStatus } from './Summary'
@@ -67,6 +68,16 @@ export function Quiz({ session, onExit, onRestart }: { session: ActiveSession; o
       }
     },
     [anki],
+  )
+
+  /** Adds an answer the learner defended to the card in Anki (real sessions only). */
+  const addAnswer = useCallback(
+    (card: StudyCard, direction: Direction, answer: string) => {
+      const field = direction === 'en-fr' ? settings.anki.mapping.french : settings.anki.mapping.english
+      if (!anki || card.id <= 0 || !field) return Promise.reject(new Error('Not available'))
+      return addAcceptedAnswer(anki, card.id, field, answer, answerLang(direction))
+    },
+    [anki, settings.anki.mapping],
   )
 
   const current = state.phase === 'done' ? null : state.cards[state.index]
@@ -169,6 +180,7 @@ export function Quiz({ session, onExit, onRestart }: { session: ActiveSession; o
             demo={session.source === 'demo'}
             canHearEnglish={!settings.voice.muted && voices?.en !== false}
             isLast={state.index === state.cards.length - 1}
+            onAddAnswer={anki ? addAnswer : undefined}
             onNext={next}
           />
         </motion.div>
@@ -205,9 +217,25 @@ interface QuizCardProps {
   canHearEnglish: boolean
   isLast: boolean
   onNext: () => void
+  /** Present in real Anki sessions: write a defended answer back into the card. */
+  onAddAnswer?: (card: StudyCard, direction: Direction, answer: string) => Promise<'added' | 'present'>
 }
 
-function QuizCard({ card, direction, state, dispatch, provider, settings, mode, setMode, demo, canHearEnglish, isLast, onNext }: QuizCardProps) {
+function QuizCard({
+  card,
+  direction,
+  state,
+  dispatch,
+  provider,
+  settings,
+  mode,
+  setMode,
+  demo,
+  canHearEnglish,
+  isLast,
+  onNext,
+  onAddAnswer,
+}: QuizCardProps) {
   const promptLang: SpeechLang = direction === 'en-fr' ? 'en-US' : 'fr-FR'
   const replyLang: SpeechLang = direction === 'en-fr' ? 'fr-FR' : 'en-US'
   const promptText = direction === 'en-fr' ? card.english : card.french
@@ -404,7 +432,16 @@ function QuizCard({ card, direction, state, dispatch, provider, settings, mode, 
         {/* ── Answer or reveal ───────────────────────────── */}
         <div className="mt-8">
           {reveal ? (
-            <Reveal card={card} direction={direction} state={state} dispatch={dispatch} demo={demo} isLast={isLast} onNext={onNext} />
+            <Reveal
+              card={card}
+              direction={direction}
+              state={state}
+              dispatch={dispatch}
+              demo={demo}
+              isLast={isLast}
+              onNext={onNext}
+              onAddAnswer={onAddAnswer}
+            />
           ) : (
             <div className="flex flex-col items-center gap-5">
               {retry && lastAttempt && (
@@ -416,6 +453,25 @@ function QuizCard({ card, direction, state, dispatch, provider, settings, mode, 
                     </>
                   )}
                   {lastAttempt.verdict.source === 'llm' && lastAttempt.verdict.feedback}
+                  {lastAttempt.verdict.source === 'local' && lastAttempt.text && (
+                    <span className="mt-1 block text-xs opacity-80">{provider ? t.quiz.judge.llmFailed : t.quiz.noAiHint}</span>
+                  )}
+                  {lastAttempt.text && (
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      className="mt-2"
+                      icon={<ThumbsUp className="size-4" />}
+                      onClick={() => {
+                        listenRef.current?.abort()
+                        listenRef.current = null
+                        setMic('idle')
+                        dispatch({ type: 'overrule', feedback: t.quiz.overruled })
+                      }}
+                    >
+                      {t.quiz.iWasRight}
+                    </Button>
+                  )}
                 </Alert>
               )}
 
@@ -509,11 +565,14 @@ function Reveal({
   demo,
   isLast,
   onNext,
-}: Pick<QuizCardProps, 'card' | 'direction' | 'state' | 'dispatch' | 'demo' | 'isLast' | 'onNext'>) {
+  onAddAnswer,
+}: Pick<QuizCardProps, 'card' | 'direction' | 'state' | 'dispatch' | 'demo' | 'isLast' | 'onNext' | 'onAddAnswer'>) {
   const outcome = state.outcome ?? 'missed'
   const style = OUTCOME_STYLE[outcome]
   const Icon = style.icon
   const last = state.attempts[state.attempts.length - 1]
+  const [teach, setTeach] = useState<'idle' | 'saving' | 'added' | 'present' | 'error'>('idle')
+  const canOverrule = outcome === 'missed' && !!last && !last.verdict.correct && !!last.text.trim()
 
   return (
     <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
@@ -564,6 +623,46 @@ function Reveal({
       )}
 
       {last?.verdict.llmError && <p className="text-xs text-amber-600 dark:text-amber-300">{t.quiz.judge.llmFailed}</p>}
+
+      {canOverrule && (
+        <Button size="sm" icon={<ThumbsUp className="size-4" />} onClick={() => dispatch({ type: 'overrule', feedback: t.quiz.overruled })}>
+          {t.quiz.myAnswerWasRight(last.text)}
+        </Button>
+      )}
+
+      {last?.verdict.overruled && (
+        <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-violet-500/20 bg-violet-500/[0.04] p-3 text-sm">
+          {onAddAnswer ? (
+            teach === 'added' || teach === 'present' ? (
+              <span className="flex items-center gap-2 text-emerald-700 dark:text-emerald-300">
+                <Check className="size-4" /> {teach === 'added' ? t.quiz.teach.added : t.quiz.teach.present}
+              </span>
+            ) : (
+              <>
+                <span className="flex-1 text-slate-600 dark:text-slate-300">{t.quiz.teach.why}</span>
+                <Button
+                  size="sm"
+                  loading={teach === 'saving'}
+                  icon={<BookmarkPlus className="size-4" />}
+                  onClick={async () => {
+                    setTeach('saving')
+                    try {
+                      setTeach(await onAddAnswer(card, direction, last.text))
+                    } catch {
+                      setTeach('error')
+                    }
+                  }}
+                >
+                  {t.quiz.teach.add(last.text)}
+                </Button>
+                {teach === 'error' && <span className="w-full text-xs text-rose-600 dark:text-rose-300">{t.quiz.teach.error}</span>}
+              </>
+            )
+          ) : (
+            <span className="text-slate-600 dark:text-slate-300">{t.quiz.teach.demo}</span>
+          )}
+        </div>
+      )}
 
       <div>
         <p className="mb-2 text-sm font-semibold">{demo ? t.quiz.gradeDemo : t.quiz.grade}</p>

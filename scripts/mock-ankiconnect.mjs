@@ -36,6 +36,13 @@ const actions = {
   deckNames: () => ['Default', 'Anglais', 'Anglais::Vocabulaire'],
   findCards: ({ query }) => (/is:new/.test(query) ? [] : cards.map((c) => c.cardId)),
   cardsInfo: ({ cards: ids }) => cards.filter((c) => ids.includes(c.cardId)),
+  updateNoteFields: ({ note }) => {
+    const card = cards.find((c) => c.note === note.id)
+    if (!card) throw new Error('note was not found')
+    for (const [name, value] of Object.entries(note.fields)) card.fields[name].value = value
+    console.log(`updateNoteFields  note ${note.id} → ${JSON.stringify(note.fields)}`)
+    return null
+  },
   answerCards: ({ answers }) => {
     for (const { cardId, ease } of answers) console.log(`answerCards  card ${cardId} → ease ${ease}`)
     return answers.map(({ cardId }) => cards.some((c) => c.cardId === cardId))

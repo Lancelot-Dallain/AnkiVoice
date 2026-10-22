@@ -16,6 +16,9 @@ import type { Verdict } from './judge'
  *
  * "I don't know" jumps straight to reveal [Again]. On reveal the learner can
  * change the proposed grade before moving on.
+ *
+ * "I was right" overrules the judge on the last wrong answer (a valid
+ * synonym the card doesn't list): the card counts as found on that try.
  */
 
 export type Stage = 'first' | 'retry'
@@ -42,6 +45,8 @@ export type SessionAction =
   | { type: 'answered'; attempt: Attempt }
   | { type: 'give-up' }
   | { type: 'set-ease'; ease: Ease }
+  /** The learner overrules the judge: their last wrong answer was right. */
+  | { type: 'overrule'; feedback: string }
   | { type: 'next' }
 
 /** Picks a direction per card; "mixed" alternates randomly. */
@@ -77,6 +82,17 @@ export function sessionReducer(state: SessionState, action: SessionAction): Sess
     case 'give-up':
       if (state.phase !== 'answer') return state
       return reveal(state, 'missed', state.attempts)
+    case 'overrule': {
+      const i = state.attempts.length - 1
+      const last = state.attempts[i]
+      if (!last || last.verdict.correct || !last.text.trim()) return state
+      const canOverrule = (state.phase === 'answer' && state.stage === 'retry') || (state.phase === 'reveal' && state.outcome === 'missed')
+      if (!canOverrule) return state
+      const attempts = state.attempts.map((a, k) =>
+        k === i ? { ...a, verdict: { ...a.verdict, correct: true, overruled: true, feedback: action.feedback } } : a,
+      )
+      return reveal(state, i === 0 ? 'first' : 'retry', attempts)
+    }
     case 'set-ease':
       if (state.phase !== 'reveal') return state
       return { ...state, ease: action.ease }

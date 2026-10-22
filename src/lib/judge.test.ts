@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { buildJudgePrompt, type JudgeInput, judgeAnswer, parseVerdict } from './judge'
+import { buildJudgePrompt, JUDGE_SYSTEM_PROMPT, type JudgeInput, judgeAnswer, parseVerdict } from './judge'
 import type { LlmProvider } from './llm'
 
 const messages = { exact: 'Exact !', close: 'Presque', wrongOffline: 'Pas tout à fait.', empty: 'Rien entendu.' }
@@ -81,5 +81,9 @@ describe('buildJudgePrompt', () => {
     expect(prompt).toContain('conjugation card')
     expect(prompt).toContain('"emprunté" | "en prunté"')
     expect(prompt).toContain('Can I borrow it?')
+  })
+
+  it('tells the AI that the card does not list every valid translation', () => {
+    expect(JUDGE_SYSTEM_PROMPT).toContain('The card lists only SOME possible translations')
   })
 })

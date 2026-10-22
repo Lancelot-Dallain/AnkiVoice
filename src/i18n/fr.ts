@@ -90,6 +90,20 @@ export const fr = {
     submit: 'Valider',
     giveUp: 'Je ne sais pas',
     firstWrong: 'Pas tout à fait.',
+    noAiHint:
+      'Sans correcteur IA, seules les réponses écrites sur la carte sont reconnues. Un synonyme correct ? Cliquez sur « J’avais juste ».',
+    iWasRight: 'J’avais juste',
+    myAnswerWasRight: (answer: string) => `Ma réponse « ${answer} » était bonne`,
+    overruled: 'Réponse acceptée par vous.',
+    teach: {
+      why: 'Pour qu’elle soit reconnue la prochaine fois, même sans IA :',
+      add: (answer: string) => `Ajouter « ${answer} » à la carte Anki`,
+      added: 'Ajoutée à la carte dans Anki.',
+      present: 'Cette réponse figure déjà sur la carte.',
+      error:
+        'Impossible de modifier la carte. Vérifiez qu’Anki est ouvert, et fermez la fenêtre « Parcourir » d’Anki si cette carte y est affichée.',
+      demo: 'Dans une vraie séance, vous pourrez ajouter cette réponse à la carte Anki.',
+    },
     outcomes: {
       first: { 'en-fr': 'Compris à l’oral !', 'fr-en': 'Trouvé du premier coup !' },
       retry: { 'en-fr': 'Compris à l’écrit', 'fr-en': 'Trouvé avec l’indice' },

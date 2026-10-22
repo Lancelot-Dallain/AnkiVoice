@@ -136,6 +136,11 @@ export class AnkiConnectClient {
     return this.invoke<CardInfo[]>('cardsInfo', { cards })
   }
 
+  /** Replaces some fields of a note (the others are left untouched). */
+  updateNoteFields(noteId: number, fields: Record<string, string>): Promise<null> {
+    return this.invoke<null>('updateNoteFields', { note: { id: noteId, fields } })
+  }
+
   /** Answers cards as if the buttons were pressed in Anki's reviewer. */
   answerCards(answers: CardAnswer[]): Promise<boolean[]> {
     if (!answers.length) return Promise.resolve([])

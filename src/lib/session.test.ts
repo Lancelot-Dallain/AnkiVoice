@@ -45,6 +45,29 @@ describe('session state machine', () => {
     expect(s).toMatchObject({ index: 1, phase: 'answer', stage: 'first', attempts: [] })
   })
 
+  it('"I was right" after a first wrong answer counts as found by ear → Good', () => {
+    let s = sessionReducer(start(), { type: 'answered', attempt: attempt(wrong, 'se faire prêter') })
+    s = sessionReducer(s, { type: 'overrule', feedback: 'Accepté' })
+    expect(s).toMatchObject({ phase: 'reveal', outcome: 'first', ease: 3 })
+    expect(s.attempts[0].verdict).toMatchObject({ correct: true, overruled: true, feedback: 'Accepté' })
+  })
+
+  it('"I was right" on the second answer → Hard', () => {
+    let s = sessionReducer(start(), { type: 'answered', attempt: attempt(wrong, 'a') })
+    s = sessionReducer(s, { type: 'answered', attempt: attempt(wrong, 'b') })
+    s = sessionReducer(s, { type: 'overrule', feedback: '' })
+    expect(s).toMatchObject({ phase: 'reveal', outcome: 'retry', ease: 2 })
+  })
+
+  it('cannot overrule a right answer, an empty one, or nothing', () => {
+    const fresh = start()
+    expect(sessionReducer(fresh, { type: 'overrule', feedback: '' })).toBe(fresh)
+    const ok = sessionReducer(start(), { type: 'answered', attempt: attempt(right) })
+    expect(sessionReducer(ok, { type: 'overrule', feedback: '' })).toBe(ok)
+    const silent = sessionReducer(start(), { type: 'answered', attempt: attempt(wrong, '  ') })
+    expect(sessionReducer(silent, { type: 'overrule', feedback: '' })).toBe(silent)
+  })
+
   it('ends after the last card', () => {
     let s = start(1)
     s = sessionReducer(s, { type: 'give-up' })
