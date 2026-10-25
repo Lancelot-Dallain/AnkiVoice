@@ -145,6 +145,19 @@ export function sessionReducer(state: SessionState, action: SessionAction): Sess
   }
 }
 
+/**
+ * "Listen to the answer" is offered only once the answer is on screen (right
+ * answer, final miss or "I don't know"), never before, so it gives nothing away.
+ */
+export function canPlayAnswer(state: SessionState): boolean {
+  return state.phase === 'reveal'
+}
+
+/** The expected answer and the language to read it in. */
+export function answerToSay(card: StudyCard, direction: Direction): { text: string; lang: 'en-US' | 'fr-FR' } {
+  return direction === 'en-fr' ? { text: card.french, lang: 'fr-FR' } : { text: card.english, lang: 'en-US' }
+}
+
 export function currentCard(state: SessionState): { card: StudyCard; direction: Direction } | null {
   if (state.phase === 'done') return null
   return { card: state.cards[state.index], direction: state.directions[state.index] }

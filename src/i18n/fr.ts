@@ -121,7 +121,9 @@ export const fr = {
     eases: { 1: 'À revoir', 2: 'Difficile', 3: 'Bien', 4: 'Facile' },
     next: 'Continuer',
     finish: 'Voir le bilan',
-    shortcuts: { enter: 'continuer', grade: 'choisir la note', mic: 'micro' },
+    shortcuts: { enter: 'continuer', grade: 'choisir la note', listen: 'écouter la réponse', mic: 'micro' },
+    playAnswer: 'Écouter la réponse',
+    playAnswerTitle: 'Écouter la bonne prononciation (touche E). Ne change pas la note.',
     judge: {
       exact: 'Exactement ça.',
       close: 'Accepté — attention à l’orthographe.',

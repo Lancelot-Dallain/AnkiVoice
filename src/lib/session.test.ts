@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { DEMO_DECK } from '../demo/deck'
 import type { Verdict } from './judge'
-import { type Attempt, assignDirections, createSession, sessionReducer, type SessionState } from './session'
+import { answerToSay, type Attempt, assignDirections, canPlayAnswer, createSession, sessionReducer, type SessionState } from './session'
 import { DEFAULT_SETTINGS, loadSettings, mergeSettings, saveSettings, STORAGE_KEY } from './settings'
 
 const right: Verdict = { correct: true, feedback: '', source: 'local' }
@@ -110,6 +110,34 @@ describe('session state machine', () => {
 
   it('an empty deck is immediately done', () => {
     expect(createSession([], []).phase).toBe('done')
+  })
+})
+
+describe('"Écouter la réponse" button', () => {
+  it('is absent before the answer is revealed, even on the second try', () => {
+    const s = start()
+    expect(canPlayAnswer(s)).toBe(false)
+    expect(canPlayAnswer(sessionReducer(s, { type: 'answered', attempt: attempt(wrong) }))).toBe(false)
+  })
+
+  it('is present after a right answer, a final miss, or "I don\'t know"', () => {
+    expect(canPlayAnswer(sessionReducer(start(), { type: 'answered', attempt: attempt(right) }))).toBe(true)
+    let missed = sessionReducer(start(), { type: 'answered', attempt: attempt(wrong) })
+    missed = sessionReducer(missed, { type: 'answered', attempt: attempt(wrong) })
+    expect(canPlayAnswer(missed)).toBe(true)
+    expect(canPlayAnswer(sessionReducer(start(), { type: 'give-up' }))).toBe(true)
+  })
+
+  it('disappears again on the next card', () => {
+    let s = sessionReducer(start(), { type: 'give-up' })
+    s = sessionReducer(s, { type: 'next' })
+    expect(canPlayAnswer(s)).toBe(false)
+  })
+
+  it('reads the answer in its own language', () => {
+    const card = DEMO_DECK[0]
+    expect(answerToSay(card, 'en-fr')).toEqual({ text: 'emprunter', lang: 'fr-FR' })
+    expect(answerToSay(card, 'fr-en')).toEqual({ text: 'to borrow', lang: 'en-US' })
   })
 })
 

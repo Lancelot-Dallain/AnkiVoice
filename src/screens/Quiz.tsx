@@ -8,7 +8,15 @@ import { addAcceptedAnswer } from '../lib/anki/cards'
 import { AnkiConnectClient } from '../lib/anki/client'
 import { judgeAnswer } from '../lib/judge'
 import { createProvider, type LlmProvider } from '../lib/llm'
-import { type Attempt, createSession, type SessionAction, sessionReducer, type SessionState } from '../lib/session'
+import {
+  answerToSay,
+  type Attempt,
+  canPlayAnswer,
+  createSession,
+  type SessionAction,
+  sessionReducer,
+  type SessionState,
+} from '../lib/session'
 import type { Settings } from '../lib/settings'
 import {
   isRecognitionSupported,
@@ -187,7 +195,8 @@ export function Quiz({ session, onExit, onRestart }: { session: ActiveSession; o
       </AnimatePresence>
 
       <p className="mt-5 hidden text-center text-xs text-slate-400 sm:block dark:text-slate-500">
-        <Kbd>Entrée</Kbd> {t.quiz.shortcuts.enter} · <Kbd>1</Kbd>–<Kbd>4</Kbd> {t.quiz.shortcuts.grade} ·{' '}
+        <Kbd>Entrée</Kbd> {t.quiz.shortcuts.enter} · <Kbd>1</Kbd>–<Kbd>4</Kbd> {t.quiz.shortcuts.grade} · <Kbd>E</Kbd>{' '}
+        {t.quiz.shortcuts.listen} ·{' '}
         <Kbd>Espace</Kbd> {t.quiz.shortcuts.mic}
       </p>
     </div>
@@ -257,6 +266,19 @@ function QuizCard({
       }),
     [settings.voice],
   )
+
+  const [answerVoiceMissing, setAnswerVoiceMissing] = useState(false)
+  /** Reads the expected answer with a voice of its language. Never changes the grade. */
+  const playAnswer = useCallback(async () => {
+    if (!canPlayAnswer(state)) return
+    const { text, lang } = answerToSay(card, direction)
+    // An explicit click plays even when automatic reading is muted.
+    const result = await speak(text, lang, {
+      rate: settings.voice.rate,
+      voiceURI: lang === 'en-US' ? settings.voice.enVoice : settings.voice.frVoice,
+    })
+    setAnswerVoiceMissing(result === 'no-voice')
+  }, [state, card, direction, settings.voice])
 
   const submit = async (candidates: string[], via: 'voice' | 'keyboard') => {
     setBusy(true)
@@ -348,6 +370,9 @@ function QuizCard({
       if (state.phase === 'reveal') {
         if (!inField && ['1', '2', '3', '4'].includes(event.key)) {
           dispatch({ type: 'set-ease', ease: Number(event.key) as Ease })
+        } else if (!inField && (event.key === 'e' || event.key === 'E') && !event.ctrlKey && !event.metaKey && !event.altKey) {
+          event.preventDefault()
+          void playAnswer()
         } else if (event.key === 'Enter') {
           event.preventDefault()
           onNext()
@@ -449,6 +474,8 @@ function QuizCard({
               onNext={onNext}
               onAddAnswer={onAddAnswer}
               onRelisten={relisten}
+              onPlayAnswer={canPlayAnswer(state) ? playAnswer : undefined}
+              answerVoiceMissing={answerVoiceMissing}
             />
           ) : (
             <div className="flex flex-col items-center gap-5">
@@ -581,8 +608,13 @@ function Reveal({
   onNext,
   onAddAnswer,
   onRelisten,
+  onPlayAnswer,
+  answerVoiceMissing,
 }: Pick<QuizCardProps, 'card' | 'direction' | 'state' | 'dispatch' | 'demo' | 'isLast' | 'onNext' | 'onAddAnswer'> & {
   onRelisten: () => void
+  /** Present only once the answer is revealed. */
+  onPlayAnswer?: () => void
+  answerVoiceMissing: boolean
 }) {
   const outcome = state.outcome ?? 'missed'
   const style = OUTCOME_STYLE[outcome]
@@ -624,6 +656,24 @@ function Reveal({
         </div>
         {card.example && direction === 'fr-en' && (
           <p className="text-sm text-slate-500 italic sm:col-span-2 dark:text-slate-400">« {card.example} »</p>
+        )}
+        {onPlayAnswer && (
+          <div className="sm:col-span-2">
+            <Button
+              size="sm"
+              icon={<Volume2 className="size-4" />}
+              onClick={onPlayAnswer}
+              title={t.quiz.playAnswerTitle}
+              aria-keyshortcuts="E"
+            >
+              {t.quiz.playAnswer}
+            </Button>
+            {answerVoiceMissing && (
+              <p className="mt-2 text-xs text-amber-600 dark:text-amber-300">
+                {t.quiz.noVoice[answerToSay(card, direction).lang]}
+              </p>
+            )}
+          </div>
         )}
       </div>
 

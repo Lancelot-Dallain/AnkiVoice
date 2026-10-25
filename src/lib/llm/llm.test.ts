@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest'
+import { beforeAll, describe, expect, it, vi } from 'vitest'
 import { createProvider, DEFAULT_LLM_SETTINGS, LlmError, type LlmSettings, testProvider } from '.'
 
 function captureFetch(status: number, json: unknown) {
@@ -43,6 +43,10 @@ describe('createProvider', () => {
 })
 
 describe('Anthropic adapter', () => {
+  // The SDK is loaded lazily by the adapter; load it once up front so a busy
+  // machine doesn't make the first test hit the default 5 s timeout.
+  beforeAll(() => import('@anthropic-ai/sdk'), 30_000)
+
   const config = settings({
     provider: 'anthropic',
     anthropic: { apiKey: 'sk-ant-test', model: 'claude-sonnet-5-5', judgeModel: 'claude-haiku-5-5' },
